@@ -1,9 +1,9 @@
 #include "verilated.h"
 #include "verilated_vcd_c.h"
-#include "Vclktick.h"
+#include "VF1.h"
 
 #include "vbuddy.cpp"     // include vbuddy code
-#define MAX_SIM_CYC 100000
+#define MAX_SIM_CYC 5000
 
 int main(int argc, char **argv, char **env) {
   int simcyc;     // simulation clock count
@@ -12,23 +12,27 @@ int main(int argc, char **argv, char **env) {
 
   Verilated::commandArgs(argc, argv);
   // init top verilog instance
-  Vclktick * top = new Vclktick;
+  VF1 * top = new VF1;
   // init trace dump
   Verilated::traceEverOn(true);
   VerilatedVcdC* tfp = new VerilatedVcdC;
   top->trace (tfp, 99);
-  tfp->open ("clktick.vcd");
+  tfp->open ("F1.vcd");
  
   // init Vbuddy
   if (vbdOpen()!=1) return(-1);
-  vbdHeader("L3T3:Clktick");
+  vbdHeader("L3T4: F1");
   vbdSetMode(1);        // Flag mode set to one-shot
 
   // initialize simulation inputs
   top->clk = 1;
-  top->rst = 0;
-  top->en = 0;
-  top->N = vbdValue();
+  top->rst_tick = 0;
+  top->rst_fsm = 0; 
+  top->rst_delay = 0;
+  top->rst_lfsr = 0;
+  top->en_lfsr = 1; 
+  //string time_elapsed = 0; 
+  
   
   // run simulation for MAX_SIM_CYC clock cycles
   for (simcyc=0; simcyc<MAX_SIM_CYC; simcyc++) {
@@ -40,15 +44,22 @@ int main(int argc, char **argv, char **env) {
     }
 
     // Display toggle neopixel
-    if (top->tick) {
-      vbdBar(lights);
-      lights = lights ^ 0xFF;
-    }
+    vbdBar(top->data_out & 0xFF);
     // set up input signals of testbench
-    top->rst = (simcyc < 2);    // assert reset for 1st cycle
-    top->en = (simcyc > 2);
+    top->rst_tick = (simcyc < 2);    // assert reset for 1st cycle
+    top->rst_fsm = (simcyc < 2);
+    top->rst_delay = (simcyc < 2);
+    top->rst_lfsr = (simcyc < 2);
     top->N = vbdValue();
+    top->trigger = vbdFlag();
     vbdCycle(simcyc);
+
+    /* if (top->data_out == 0) {
+      vbdInitWatch(); 
+      if (vbdFlag()) {
+        printf("Time elapsed: %d\n", vbdElapsed());
+      }
+    } */
 
     if (Verilated::gotFinish() || (vbdGetkey() == 'q'))  exit(0);
   }
